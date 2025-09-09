@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Document OCR Extractor | Aadhaar & PAN</title>
+    <style>
+        /* Reset & base styles */
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4b6cb7, #182848);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Container */
+        .container {
+            background: #fff;
+            width: 100%;
+            max-width: 700px;
+            border-radius: 15px;
+            padding: 40px 50px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        h1 {
+            text-align: center;
+            font-weight: 700;
+            color: #182848;
+            margin-bottom: 15px;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: #4b6cb7;
+            margin-bottom: 35px;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* Form Styles */
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #182848;
+            margin-bottom: 6px;
+            font-size: 1rem;
+        }
+
+        select, input[type="file"] {
+            padding: 12px 15px;
+            font-size: 1rem;
+            border-radius: 8px;
+            border: 1.8px solid #4b6cb7;
+            transition: border-color 0.3s ease;
+            cursor: pointer;
+        }
+
+        select:focus, input[type="file"]:focus {
+            border-color: #182848;
+            outline: none;
+        }
+
+        button {
+            background: #4b6cb7;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 0;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 6px 15px rgba(75, 108, 183, 0.5);
+        }
+        button:hover {
+            background: #182848;
+        }
+
+        /* Messages */
+        .error {
+            background: #fddede;
+            color: #b92525;
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            border: 1.5px solid #b92525;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .result {
+            background: #e4f3e8;
+            border: 1.5px solid #3b7a3b;
+            padding: 25px 30px;
+            border-radius: 12px;
+            margin-top: 35px;
+            box-shadow: 0 4px 20px rgba(59, 122, 59, 0.25);
+        }
+        .result h3 {
+            color: #2f5730;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        .result p {
+            font-size: 1.1rem;
+            margin: 10px 0;
+            color: #1f3a1f;
+            letter-spacing: 0.03em;
+        }
+
+        /* Raw text box */
+        .raw-text {
+            background: #f7faf7;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            color: #344d41;
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+            border: 1px solid #a9d18e;
+        }
+
+        /* Responsive */
+        @media(max-width: 480px) {
+            .container {
+                padding: 30px 25px;
+            }
+            button {
+                font-size: 1rem;
+                padding: 12px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Document OCR Extractor</h1>
+    <p class="subtitle">Extract Aadhaar Number, PAN Number, and Date of Birth from your documents</p>
+
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" id="ocrForm" novalidate>
+        <label for="document_type">Select Document Type</label>
+        <select name="document_type" id="document_type" required>
+            <option value="" disabled {% if not doc_type %}selected{% endif %}>-- Choose Document --</option>
+            <option value="aadhaar" {% if doc_type == 'aadhaar' %}selected{% endif %}>Aadhaar Card</option>
+            <option value="pan" {% if doc_type == 'pan' %}selected{% endif %}>PAN Card</option>
+        </select>
+
+        <label for="image">Upload Document Image</label>
+        <input type="file" id="image" name="image" accept="image/*" required />
+
+        <button type="submit">Extract Details</button>
+    </form>
+
+    {% if extracted %}
+    <div class="result" tabindex="0" aria-live="polite">
+        <h3>Extracted Details</h3>
+        {% if extracted.aadhaar_number %}
+            <p><strong>Aadhaar Number:</strong> {{ extracted.aadhaar_number }}</p>
+        {% endif %}
+        {% if extracted.pan_number %}
+            <p><strong>PAN Number:</strong> {{ extracted.pan_number }}</p>
+        {% endif %}
+        <p><strong>Date of Birth:</strong> {{ extracted.date_of_birth }}</p>
+
+        <h4>Raw OCR Text</h4>
+        <div class="raw-text" aria-label="Raw OCR extracted text">{{ extracted.raw_text }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    // Client-side validation
+    const form = document.getElementById('ocrForm');
+    const docTypeSelect = document.getElementById('document_type');
+    const fileInput = document.getElementById('image');
+
+    form.addEventListener('submit', e => {
+        docTypeSelect.setCustomValidity('');
+        fileInput.setCustomValidity('');
+
+        if (!docTypeSelect.value) {
+            docTypeSelect.setCustomValidity('Please select a document type.');
+        }
+        if (!fileInput.value) {
+            fileInput.setCustomValidity('Please upload an image file.');
+        }
+
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            form.reportValidity();
+        }
+    });
+</script>
+
+</body>
+</html>
